@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>How EdgeEval Works — Per-Class CV Model Regression Testing Pipeline</title>
+<meta name="description" content="How EdgeEval evaluates quantized computer vision models: upload a baseline and candidate (YOLO, ONNX, INT8), run inference on identical data, compute IoU-matched per-class precision/recall/mAP@0.5, benchmark latency, apply regression thresholds, and get a deployment recommendation." />
+<link rel="icon" type="image/svg+xml" href="/logo.svg" />
+<style>
+  :root {
+    --cream: #f4f1e8;
+    --panel: #faf8f2;
+    --ink: #1c1b18;
+    --muted: #6e6a5e;
+    --line: #e2ddcd;
+    --accent: #29392f;
+    --accent-2: #a8462f;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--cream);
+    color: var(--ink);
+    font-family: Georgia, "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 22px 40px; max-width: 1180px; margin: 0 auto;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+  .logo img { width: 34px; height: 34px; display: block; }
+  .logo-name { font-size: 19px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink); }
+  .nav-links {
+    display: flex; gap: 28px; align-items: center; font-size: 15px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  .nav-links a.link { color: var(--ink); text-decoration: none; }
+  .nav-links a.link:hover { color: var(--accent-2); }
+  a.btn-cta {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--ink); color: var(--cream) !important; border: none;
+    padding: 10px 22px; border-radius: 999px; font-size: 14px; font-weight: 600;
+    cursor: pointer; text-decoration: none; display: inline-block;
+    transition: background 0.15s ease, transform 0.15s ease;
+  }
+  a.btn-cta:hover { background: var(--accent-2); transform: translateY(-1px); }
+
+  .page-head { max-width: 760px; margin: 40px auto 0; padding: 0 24px; text-align: center; }
+  .page-head h1 { font-size: 44px; font-weight: 400; line-height: 1.18; margin: 0; }
+  .page-head h1 em { font-style: italic; color: var(--accent-2); }
+  .page-head p {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    color: var(--muted); font-size: 16.5px; line-height: 1.6; max-width: 640px; margin: 20px auto 0;
+  }
+
+  .section { max-width: 1000px; margin: 0 auto; padding: 44px 24px 80px; }
+  .diagram-wrap {
+    border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
+    background: var(--panel); box-shadow: 0 8px 30px rgba(0,0,0,0.06);
+  }
+  .diagram-wrap img { width: 100%; display: block; }
+
+  .steps {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 28px; margin-top: 48px;
+  }
+  .step { padding-right: 12px; }
+  .step .num {
+    font-family: Georgia, serif; font-style: italic; color: var(--accent-2);
+    font-size: 22px; display: block; margin-bottom: 6px;
+  }
+  .step h3 { font-family: Georgia, serif; font-size: 18px; margin: 0 0 8px; font-weight: 600; }
+  .step p { color: var(--muted); font-size: 14.5px; line-height: 1.6; margin: 0; }
+
+  .why {
+    margin-top: 60px; padding: 32px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  .why h2 { font-family: Georgia, serif; font-size: 24px; font-weight: 400; margin-top: 0; }
+  .why p { color: var(--muted); font-size: 15px; line-height: 1.7; }
+  .why ul { color: var(--muted); font-size: 15px; line-height: 1.8; padding-left: 20px; }
+
+  .cta-row { text-align: center; margin-top: 56px; }
+  .cta-row a.btn-cta { font-size: 16px; padding: 14px 30px; }
+
+  footer {
+    border-top: 1px solid var(--line); margin-top: 20px; padding: 44px 24px 36px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  .footer-inner { max-width: 1000px; margin: 0 auto; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 32px; }
+  .footer-brand { max-width: 340px; }
+  .footer-brand .logo { margin-bottom: 12px; }
+  .footer-brand p { color: var(--muted); font-size: 13.5px; line-height: 1.6; }
+  .footer-links { display: flex; gap: 60px; flex-wrap: wrap; }
+  .footer-col h4 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 0 0 12px; }
+  .footer-col a { display: flex; align-items: center; gap: 8px; color: var(--ink); text-decoration: none; font-size: 14px; margin-bottom: 10px; }
+  .footer-col a:hover { color: var(--accent-2); }
+  .footer-col svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .footer-bottom { max-width: 1000px; margin: 32px auto 0; padding-top: 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12.5px; text-align: center; }
+</style>
+</head>
+<body>
+
+  <nav>
+    <a href="/" class="logo">
+      <img src="/logo.svg" alt="EdgeEval logo" />
+      <span class="logo-name">EdgeEval</span>
+    </a>
+    <div class="nav-links">
+      <a href="/how-it-works" class="link">How It Works</a>
+      <a href="https://www.farhanai.online/contact" target="_blank" rel="noopener" class="link">Contact</a>
+      <a href="/#run" class="btn-cta">Run Evaluation</a>
+    </div>
+  </nav>
+
+  <section class="page-head">
+    <h1>How EdgeEval turns a quantized model<br /><em>into a deployment decision</em></h1>
+    <p>
+      A computer-vision model evaluation pipeline purpose-built for edge deployment:
+      compare a baseline FP32 model against a quantized INT8, ONNX, or RKNN export,
+      and get a per-class regression report instead of a single misleading accuracy number.
+    </p>
+  </section>
+
+  <section class="section">
+    <div class="diagram-wrap">
+      <img
+        src="/how-it-works.png"
+        alt="EdgeEval computer vision model evaluation pipeline diagram: upload baseline and quantized candidate model plus validation dataset, FastAPI receives the request, the system loads both models and the dataset, runs inference, computes IoU-matched per-class precision, recall, AP, and mAP@0.5, benchmarks latency, applies configurable regression thresholds, and returns a pass or fail deployment recommendation with a full JSON report."
+      />
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <span class="num">01</span>
+        <h3>Upload baseline &amp; candidate</h3>
+        <p>Provide your original FP32 model (.pt) and the quantized or optimized export you want to validate (.onnx, INT8), plus a YOLO-format validation set (images/ + labels/).</p>
+      </div>
+      <div class="step">
+        <span class="num">02</span>
+        <h3>Inference on identical data</h3>
+        <p>Both models run against the exact same images, so any accuracy or latency difference is attributable to the optimization itself — not dataset variance.</p>
+      </div>
+      <div class="step">
+        <span class="num">03</span>
+        <h3>IoU matching &amp; per-class mAP</h3>
+        <p>Predicted boxes are matched to ground truth at an IoU of 0.5. Precision, recall, and AP are computed per class, not just as one aggregate score.</p>
+      </div>
+      <div class="step">
+        <span class="num">04</span>
+        <h3>Latency benchmark</h3>
+        <p>Warm-up runs are discarded, then both models are timed on identical input on the same hardware — isolating the real speed/accuracy tradeoff of quantization.</p>
+      </div>
+      <div class="step">
+        <span class="num">05</span>
+        <h3>Threshold-based flags</h3>
+        <p>Any per-class AP drop beyond a configurable tolerance is flagged WARNING or CRITICAL — a deterministic, CI-style gate instead of a subjective read of a chart.</p>
+      </div>
+      <div class="step">
+        <span class="num">06</span>
+        <h3>Deployment recommendation</h3>
+        <p>A rule-based verdict — safe to deploy, or not — backed by the full structured report so you can see exactly which class regressed and by how much.</p>
+      </div>
+    </div>
+
+    <div class="why">
+      <h2>Why per-class evaluation matters for edge AI quantization</h2>
+      <p>
+        Quantizing a YOLO or other CV detection model to INT8 for RKNN, ONNX Runtime, or
+        another edge runtime almost always trades some accuracy for speed — but that tradeoff
+        is rarely uniform across classes. A model can lose 15–20 points of AP on one class
+        (say, <em>person</em>) while barely moving on others, and the aggregate mAP can shift
+        by only a percentage point or two, hiding a regression that would fail badly in
+        production on exactly the class your deployment depends on.
+      </p>
+      <ul>
+        <li>Aggregate mAP@0.5 alone cannot tell you <em>which</em> class regressed.</li>
+        <li>Precision and recall are tracked separately — a security camera use case cares about recall (missed detections), a quality-control line cares about precision (false alarms).</li>
+        <li>Latency and accuracy are reported together, because the real question is never "is it faster," it's "is it still accurate enough at this speed."</li>
+        <li>Thresholds are configurable and rule-based, so the pass/fail gate behaves like a CI test — deterministic, repeatable, and explainable.</li>
+      </ul>
+    </div>
+
+    <div class="cta-row">
+      <a href="/#run" class="btn-cta">Run your first evaluation →</a>
+    </div>
+  </section>
+
+  <footer>
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <a href="/" class="logo"><img src="/logo.svg" alt="EdgeEval logo" /><span class="logo-name">EdgeEval</span></a>
+        <p>Per-class computer vision model evaluation for edge deployment. Built for YOLO, ONNX Runtime, and INT8/RKNN quantization workflows.</p>
+      </div>
+      <div class="footer-links">
+        <div class="footer-col">
+          <h4>Product</h4>
+          <a href="/">Home</a>
+          <a href="/how-it-works">How It Works</a>
+          <a href="/#run">Run Evaluation</a>
+        </div>
+        <div class="footer-col">
+          <h4>Contact</h4>
+          <a href="https://www.farhanai.online/contact" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg>
+            farhanai.online/contact
+          </a>
+          <a href="mailto:farhanwork0318@gmail.com">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8l9 6 9-6"/><rect x="3" y="5" width="18" height="14" rx="2"/></svg>
+            farhanwork0318@gmail.com
+          </a>
+          <a href="https://github.com/muhmdfarhan0" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.09 3.29 9.4 7.86 10.93.58.1.79-.25.79-.56 0-.28-.01-1.02-.02-2-3.2.7-3.88-1.54-3.88-1.54-.52-1.33-1.28-1.69-1.28-1.69-1.04-.72.08-.7.08-.7 1.15.08 1.76 1.19 1.76 1.19 1.03 1.75 2.69 1.25 3.35.96.1-.74.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.7 0-1.26.45-2.29 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.24 2.76.12 3.05.74.8 1.19 1.83 1.19 3.09 0 4.43-2.7 5.4-5.27 5.69.42.36.78 1.08.78 2.18 0 1.57-.01 2.84-.01 3.23 0 .31.2.67.8.56A10.98 10.98 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z"/></svg>
+            github.com/muhmdfarhan0
+          </a>
+          <a href="https://www.linkedin.com/in/muhammad-farhan07567" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.86 0-2.14 1.45-2.14 2.94v5.67H9.34V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.45v6.29zM5.34 7.43a2.07 2.07 0 1 1 0-4.14 2.07 2.07 0 0 1 0 4.14zM7.12 20.45H3.56V9h3.56v11.45z"/></svg>
+            linkedin.com/in/muhammad-farhan07567
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">© 2026 EdgeEval by Muhammad Farhan. Built for edge AI quantization testing — YOLO · ONNX · INT8 · RKNN.</div>
+  </footer>
+
+</body>
+</html>

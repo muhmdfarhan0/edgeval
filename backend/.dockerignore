@@ -1,0 +1,10 @@
+venv/
+.tmp/
+.pipcache/
+data/
+datasets/
+*.pt
+*.onnx
+__pycache__/
+*.pyc
+.git/

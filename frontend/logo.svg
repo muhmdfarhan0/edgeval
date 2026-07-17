@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <rect width="48" height="48" rx="10" fill="#1c1b18"/>
+  <!-- detection viewfinder corner brackets -->
+  <path d="M13 17V13H17" stroke="#f4f1e8" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M31 13H35V17" stroke="#f4f1e8" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M13 31V35H17" stroke="#f4f1e8" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M35 31V35H31" stroke="#f4f1e8" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- validated-detection checkmark -->
+  <path d="M17 24.5L21.5 29L32 18" stroke="#a8462f" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

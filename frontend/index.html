@@ -1,0 +1,702 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>EdgeEval — Catch CV Model Regressions Before You Ship to the Edge</title>
+<meta name="description" content="EdgeEval evaluates quantized and optimized computer vision models (YOLO, ONNX, INT8) against a baseline. Get per-class mAP, precision/recall deltas, latency benchmarks, and a rule-based deployment recommendation before you deploy to edge hardware." />
+<link rel="icon" type="image/svg+xml" href="/logo.svg" />
+<style>
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.55; transform: scale(0.85); }
+  }
+  @keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(6px); }
+  }
+  @keyframes shimmer {
+    0% { background-position: -400px 0; }
+    100% { background-position: 400px 0; }
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  :root {
+    --cream: #f4f1e8;
+    --panel: #faf8f2;
+    --ink: #1c1b18;
+    --muted: #6e6a5e;
+    --line: #e2ddcd;
+    --accent: #29392f;
+    --accent-2: #a8462f;
+    --ok: #2f7a4f;
+    --warn: #b8791c;
+    --critical: #b3352b;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--cream);
+    color: var(--ink);
+    font-family: Georgia, "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .sans {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+
+  /* ---------- nav ---------- */
+  nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 22px 40px;
+    max-width: 1180px;
+    margin: 0 auto;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+  .logo img { width: 34px; height: 34px; display: block; }
+  .logo-name { font-size: 19px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink); }
+  .nav-links {
+    display: flex; gap: 28px; align-items: center;
+    font-size: 15px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  .nav-links a.link { color: var(--ink); text-decoration: none; }
+  .nav-links a.link:hover { color: var(--accent-2); }
+
+  a.btn-cta {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--ink);
+    color: var(--cream) !important;
+    border: none;
+    padding: 10px 22px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    transition: background 0.15s ease, transform 0.15s ease;
+  }
+  a.btn-cta:hover { background: var(--accent-2); transform: translateY(-1px); }
+
+  /* ---------- hero ---------- */
+  .hero {
+    max-width: 900px;
+    margin: 50px auto 10px;
+    padding: 0 24px;
+    text-align: center;
+  }
+  .hero h1 {
+    font-size: 58px;
+    line-height: 1.12;
+    font-weight: 400;
+    margin: 0;
+    animation: fadeUp 0.8s ease both;
+  }
+  .hero h1 em {
+    font-style: italic;
+    color: var(--accent-2);
+  }
+  .hero .sub {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    color: var(--muted);
+    font-size: 17px;
+    max-width: 620px;
+    margin: 26px auto 0;
+    line-height: 1.55;
+    animation: fadeUp 0.9s ease 0.1s both;
+  }
+  .footnote {
+    max-width: 480px;
+    margin: 36px auto 0;
+    font-style: italic;
+    color: var(--muted);
+    font-size: 15px;
+    line-height: 1.5;
+    animation: fadeUp 1s ease 0.2s both;
+  }
+  .footnote .attrib { display: block; margin-top: 10px; font-style: italic; }
+  .hero-cta {
+    margin-top: 32px;
+    animation: fadeUp 1.1s ease 0.3s both;
+  }
+  .chevron {
+    text-align: center;
+    margin: 40px 0 6px;
+    animation: bounce 2s ease-in-out infinite;
+    color: var(--muted);
+    font-size: 22px;
+  }
+
+  .section {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 30px 24px 70px;
+  }
+  .section h2 {
+    font-size: 30px;
+    font-weight: 400;
+    text-align: center;
+    margin-bottom: 8px;
+  }
+  .section .lede {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    text-align: center;
+    color: var(--muted);
+    max-width: 620px;
+    margin: 0 auto 40px;
+    font-size: 16px;
+    line-height: 1.6;
+  }
+
+  /* ---------- card / form ---------- */
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 32px;
+    margin-top: 24px;
+  }
+  .card h2 {
+    font-size: 15px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    margin-top: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-weight: 600;
+  }
+  .field { margin-bottom: 18px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+  .field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 7px; }
+  input[type="file"] {
+    width: 100%;
+    padding: 12px;
+    background: var(--cream);
+    border: 1.5px dashed var(--line);
+    border-radius: 8px;
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  input[type="file"]:hover, input[type="file"]:focus {
+    border-color: var(--accent-2);
+    background: #fffdf8;
+  }
+
+  button.run-btn {
+    position: relative;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: linear-gradient(90deg, var(--ink) 0%, var(--accent-2) 50%, var(--ink) 100%);
+    background-size: 300% 100%;
+    background-position: 0% 0%;
+    color: var(--cream);
+    border: none;
+    padding: 15px 30px;
+    border-radius: 999px;
+    font-size: 15.5px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(28,27,24,0.18);
+    transition: transform 0.18s ease, box-shadow 0.18s ease, background-position 0.5s ease;
+  }
+  button.run-btn::after {
+    content: '→';
+    margin-left: 8px;
+    display: inline-block;
+    transition: transform 0.18s ease;
+  }
+  button.run-btn:hover {
+    background-position: 100% 0%;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 22px rgba(168,70,47,0.32);
+  }
+  button.run-btn:hover::after { transform: translateX(4px); }
+  button.run-btn:active { transform: translateY(0); }
+  button.run-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  /* ---------- progress stepper ---------- */
+  #progress-panel {
+    display: none;
+    margin-top: 24px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  .progress-track {
+    height: 8px;
+    border-radius: 999px;
+    background: var(--line);
+    overflow: hidden;
+    position: relative;
+  }
+  .progress-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--accent) 0%, var(--accent-2) 50%, var(--accent) 100%);
+    background-size: 800px 100%;
+    animation: shimmer 2.2s linear infinite;
+    width: 5%;
+    transition: width 0.6s ease;
+  }
+  .progress-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12.5px;
+    color: var(--muted);
+    margin-top: 8px;
+  }
+  .stage-list { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; }
+  .stage-row { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--muted); }
+  .stage-row.active { color: var(--ink); font-weight: 600; }
+  .stage-row.done { color: var(--ok); }
+  .stage-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--line);
+    flex-shrink: 0;
+  }
+  .stage-row.active .stage-dot {
+    background: var(--accent-2);
+    animation: pulse 1.1s ease-in-out infinite;
+  }
+  .stage-row.done .stage-dot { background: var(--ok); }
+  .spinner {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    border: 2px solid var(--line);
+    border-top-color: var(--accent-2);
+    animation: spin 0.8s linear infinite;
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+
+  /* ---------- results ---------- */
+  .banner {
+    border-radius: 12px;
+    padding: 18px 22px;
+    font-size: 15.5px;
+    font-weight: 600;
+    margin-top: 28px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    animation: fadeUp 0.5s ease both;
+  }
+  .banner.pass { background: rgba(47,122,79,0.12); border: 1px solid var(--ok); color: var(--ok); }
+  .banner.fail { background: rgba(179,53,43,0.1); border: 1px solid var(--critical); color: var(--critical); }
+
+  .stat-row { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 16px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+  .stat {
+    flex: 1; min-width: 160px;
+    background: var(--cream);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 15px 17px;
+  }
+  .stat .label { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .stat .value { font-size: 23px; font-weight: 700; margin-top: 4px; font-family: Georgia, serif; }
+  .stat .delta { font-size: 13px; margin-top: 2px; }
+  .delta.down { color: var(--critical); }
+  .delta.up { color: var(--ok); }
+
+  table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 14px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; font-size: 11.5px; text-transform: uppercase; }
+  tr.CRITICAL td:first-child { border-left: 3px solid var(--critical); }
+  tr.WARNING td:first-child { border-left: 3px solid var(--warn); }
+  tr.OK td:first-child { border-left: 3px solid var(--ok); }
+  .flag-pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+  .flag-pill.CRITICAL { background: rgba(179,53,43,0.14); color: var(--critical); }
+  .flag-pill.WARNING { background: rgba(184,121,28,0.16); color: var(--warn); }
+  .flag-pill.OK { background: rgba(47,122,79,0.12); color: var(--ok); }
+
+  #status-line { color: var(--muted); font-size: 14px; margin-top: 10px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+
+  .insights-card {
+    background: linear-gradient(180deg, var(--panel) 0%, #f7f2e6 100%);
+    border-color: #d9cdb3;
+  }
+  .insights-summary {
+    font-family: Georgia, serif;
+    font-size: 16.5px;
+    line-height: 1.6;
+    margin: 4px 0 14px;
+  }
+  .insights-cause {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    color: var(--muted);
+    line-height: 1.6;
+    margin: 0 0 14px;
+  }
+  .insights-recs {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.8;
+    margin: 0 0 10px;
+    padding-left: 20px;
+  }
+  .insights-recs li { margin-bottom: 4px; }
+  .insights-attrib {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 11.5px;
+    color: var(--muted);
+    text-align: right;
+  }
+
+  /* ---------- footer ---------- */
+  footer {
+    border-top: 1px solid var(--line);
+    margin-top: 40px;
+    padding: 44px 24px 36px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  .footer-inner {
+    max-width: 1000px;
+    margin: 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 32px;
+  }
+  .footer-brand { max-width: 340px; }
+  .footer-brand .logo { margin-bottom: 12px; }
+  .footer-brand p { color: var(--muted); font-size: 13.5px; line-height: 1.6; }
+  .footer-links { display: flex; gap: 60px; flex-wrap: wrap; }
+  .footer-col h4 {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--muted); margin: 0 0 12px;
+  }
+  .footer-col a {
+    display: flex; align-items: center; gap: 8px;
+    color: var(--ink); text-decoration: none;
+    font-size: 14px; margin-bottom: 10px;
+  }
+  .footer-col a:hover { color: var(--accent-2); }
+  .footer-col svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .footer-bottom {
+    max-width: 1000px; margin: 32px auto 0; padding-top: 20px;
+    border-top: 1px solid var(--line);
+    color: var(--muted); font-size: 12.5px; text-align: center;
+  }
+</style>
+</head>
+<body>
+
+  <nav>
+    <a href="/" class="logo">
+      <img src="/logo.svg" alt="EdgeEval logo" />
+      <span class="logo-name">EdgeEval</span>
+    </a>
+    <div class="nav-links">
+      <a href="/how-it-works" class="link">How It Works</a>
+      <a href="https://www.farhanai.online/contact" target="_blank" rel="noopener" class="link">Contact</a>
+      <a href="#run" class="btn-cta">Run Evaluation</a>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <h1>Catch model regressions<br /><em>before they ship to the edge</em></h1>
+    <p class="sub">
+      Upload a baseline model and a quantized or optimized candidate, plus a validation set.
+      EdgeEval runs both, matches predictions with IoU, and surfaces the per-class accuracy
+      regressions that aggregate mAP hides — with a latency comparison and a deployment
+      recommendation, in minutes.
+    </p>
+    <p class="footnote">
+      “A model can lose 20 points of AP on <em>person</em> detection while gaining 5 on
+      <em>car</em> — and the aggregate mAP barely moves. Per-class breakdown is the only
+      way to catch it before it ships.”
+      <span class="attrib">— why EdgeEval exists</span>
+    </p>
+    <div class="hero-cta">
+      <a href="#run" class="btn-cta">Run an Evaluation ↓</a>
+    </div>
+  </section>
+
+  <div class="chevron">⌄</div>
+
+  <section class="section" id="run">
+    <h2>Run an Evaluation</h2>
+    <p class="lede">Upload your models and validation set below to generate a live per-class regression report. Curious how the pipeline works first? See <a href="/how-it-works" style="color:var(--accent-2)">How It Works</a>.</p>
+
+    <div class="card">
+      <h2>Evaluation inputs</h2>
+      <form id="eval-form">
+        <div class="field">
+          <label for="baseline_model">Baseline model (.pt or .onnx)</label>
+          <input type="file" id="baseline_model" name="baseline_model" required />
+        </div>
+        <div class="field">
+          <label for="candidate_model">Candidate model (.pt or .onnx — e.g. quantized/INT8)</label>
+          <input type="file" id="candidate_model" name="candidate_model" required />
+        </div>
+        <div class="field">
+          <label for="validation_dataset">Validation dataset (.zip, YOLO format: images/ + labels/)</label>
+          <input type="file" id="validation_dataset" name="validation_dataset" required accept=".zip" />
+        </div>
+        <button type="submit" class="run-btn" id="submit-btn">Run evaluation</button>
+        <div id="status-line"></div>
+      </form>
+
+      <div id="progress-panel">
+        <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+        <div class="progress-meta">
+          <span id="progress-label">Queued…</span>
+          <span id="progress-timer">0:00</span>
+        </div>
+        <div class="stage-list" id="stage-list"></div>
+      </div>
+    </div>
+
+    <div id="results"></div>
+  </section>
+
+  <footer>
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <a href="/" class="logo"><img src="/logo.svg" alt="EdgeEval logo" /><span class="logo-name">EdgeEval</span></a>
+        <p>Per-class computer vision model evaluation for edge deployment. Built for YOLO, ONNX Runtime, and INT8/RKNN quantization workflows.</p>
+      </div>
+      <div class="footer-links">
+        <div class="footer-col">
+          <h4>Product</h4>
+          <a href="/">Home</a>
+          <a href="/how-it-works">How It Works</a>
+          <a href="#run">Run Evaluation</a>
+        </div>
+        <div class="footer-col">
+          <h4>Contact</h4>
+          <a href="https://www.farhanai.online/contact" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg>
+            farhanai.online/contact
+          </a>
+          <a href="mailto:farhanwork0318@gmail.com">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8l9 6 9-6"/><rect x="3" y="5" width="18" height="14" rx="2"/></svg>
+            farhanwork0318@gmail.com
+          </a>
+          <a href="https://github.com/muhmdfarhan0" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.09 3.29 9.4 7.86 10.93.58.1.79-.25.79-.56 0-.28-.01-1.02-.02-2-3.2.7-3.88-1.54-3.88-1.54-.52-1.33-1.28-1.69-1.28-1.69-1.04-.72.08-.7.08-.7 1.15.08 1.76 1.19 1.76 1.19 1.03 1.75 2.69 1.25 3.35.96.1-.74.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.7 0-1.26.45-2.29 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.24 2.76.12 3.05.74.8 1.19 1.83 1.19 3.09 0 4.43-2.7 5.4-5.27 5.69.42.36.78 1.08.78 2.18 0 1.57-.01 2.84-.01 3.23 0 .31.2.67.8.56A10.98 10.98 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z"/></svg>
+            github.com/muhmdfarhan0
+          </a>
+          <a href="https://www.linkedin.com/in/muhammad-farhan07567" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.86 0-2.14 1.45-2.14 2.94v5.67H9.34V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.45v6.29zM5.34 7.43a2.07 2.07 0 1 1 0-4.14 2.07 2.07 0 0 1 0 4.14zM7.12 20.45H3.56V9h3.56v11.45z"/></svg>
+            linkedin.com/in/muhammad-farhan07567
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">© 2026 EdgeEval by Muhammad Farhan. Built for edge AI quantization testing — YOLO · ONNX · INT8 · RKNN.</div>
+  </footer>
+
+<script>
+// Set this to your deployed backend's URL (Railway/Render/HF Spaces), e.g.
+// "https://edgeval-api.up.railway.app". Leave empty only if the frontend is
+// served from the same origin as the backend (local dev via the backend's
+// own static mount, or a reverse proxy).
+const API_BASE = "";
+
+const STAGES = [
+  { key: "queued", label: "Queued" },
+  { key: "loading_dataset", label: "Loading validation dataset" },
+  { key: "loading_models", label: "Loading baseline & candidate models" },
+  { key: "evaluating_baseline", label: "Running baseline model inference" },
+  { key: "evaluating_candidate", label: "Running candidate model inference" },
+  { key: "benchmarking_latency", label: "Benchmarking latency" },
+  { key: "building_report", label: "Building comparison report" },
+  { key: "generating_insights", label: "Generating AI insights" },
+  { key: "complete", label: "Done" },
+];
+
+const form = document.getElementById('eval-form');
+const statusLine = document.getElementById('status-line');
+const submitBtn = document.getElementById('submit-btn');
+const resultsEl = document.getElementById('results');
+const progressPanel = document.getElementById('progress-panel');
+const progressFill = document.getElementById('progress-fill');
+const progressLabel = document.getElementById('progress-label');
+const progressTimer = document.getElementById('progress-timer');
+const stageListEl = document.getElementById('stage-list');
+
+let timerHandle = null;
+let startTime = null;
+
+function renderStageList(activeIndex) {
+  stageListEl.innerHTML = STAGES.map((s, i) => {
+    const cls = i < activeIndex ? 'done' : (i === activeIndex ? 'active' : '');
+    const marker = i < activeIndex ? '✓' : (i === activeIndex ? '<span class="spinner"></span>' : '');
+    return `<div class="stage-row ${cls}"><span class="stage-dot"></span>${marker ? '' : ''}${s.label}${i === activeIndex ? ' ' + marker : ''}</div>`;
+  }).join('');
+}
+
+function startTimer() {
+  startTime = Date.now();
+  timerHandle = setInterval(() => {
+    const secs = Math.floor((Date.now() - startTime) / 1000);
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    progressTimer.textContent = `${m}:${s.toString().padStart(2, '0')}`;
+  }, 250);
+}
+
+function stopTimer() {
+  if (timerHandle) clearInterval(timerHandle);
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  resultsEl.innerHTML = '';
+  submitBtn.disabled = true;
+  statusLine.textContent = 'Uploading…';
+  progressPanel.style.display = 'block';
+  progressFill.style.width = '5%';
+  renderStageList(0);
+  startTimer();
+
+  const fd = new FormData();
+  fd.append('baseline_model', document.getElementById('baseline_model').files[0]);
+  fd.append('candidate_model', document.getElementById('candidate_model').files[0]);
+  fd.append('validation_dataset', document.getElementById('validation_dataset').files[0]);
+
+  try {
+    const res = await fetch(`${API_BASE}/evaluate`, { method: 'POST', body: fd });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    const { job_id } = await res.json();
+    statusLine.textContent = `Job ${job_id} queued`;
+    await poll(job_id);
+  } catch (err) {
+    statusLine.textContent = `Error: ${err.message}`;
+    submitBtn.disabled = false;
+    stopTimer();
+    progressPanel.style.display = 'none';
+  }
+});
+
+async function poll(jobId) {
+  while (true) {
+    const res = await fetch(`${API_BASE}/evaluate/${jobId}/status`);
+    const data = await res.json();
+
+    const idx = data.stage_index ?? 0;
+    const total = (data.total_stages ?? STAGES.length) - 1;
+    const pct = Math.max(5, Math.min(100, Math.round((idx / total) * 100)));
+    progressFill.style.width = `${pct}%`;
+    progressLabel.textContent = STAGES[idx] ? STAGES[idx].label + '…' : data.stage;
+    renderStageList(idx);
+
+    if (data.status === 'complete') {
+      stopTimer();
+      progressFill.style.width = '100%';
+      progressLabel.textContent = 'Done';
+      renderStageList(STAGES.length);
+      statusLine.textContent = `Completed in ${progressTimer.textContent}`;
+      submitBtn.disabled = false;
+      const reportRes = await fetch(`${API_BASE}/evaluate/${jobId}/report`);
+      renderReport(await reportRes.json());
+      return;
+    }
+    if (data.status === 'failed') {
+      stopTimer();
+      statusLine.textContent = `Failed: ${data.error || 'unknown error'}`;
+      submitBtn.disabled = false;
+      progressPanel.style.display = 'none';
+      return;
+    }
+    await new Promise(r => setTimeout(r, 1500));
+  }
+}
+
+function renderReport(report) {
+  const pass = report.deploy_recommended;
+  const banner = `<div class="banner ${pass ? 'pass' : 'fail'}">${pass ? '✅' : '⛔'} ${report.recommendation}</div>`;
+
+  const lat = report.latency;
+  const speedup = lat.speedup_factor ? `${lat.speedup_factor.toFixed(2)}x` : 'n/a';
+
+  const stats = `
+    <div class="stat-row">
+      <div class="stat">
+        <div class="label">Baseline mAP@0.5</div>
+        <div class="value">${report.baseline_overall_map.toFixed(3)}</div>
+      </div>
+      <div class="stat">
+        <div class="label">Candidate mAP@0.5</div>
+        <div class="value">${report.candidate_overall_map.toFixed(3)}</div>
+        <div class="delta ${report.overall_map_delta < 0 ? 'down' : 'up'}">${report.overall_map_delta >= 0 ? '+' : ''}${report.overall_map_delta.toFixed(3)}</div>
+      </div>
+      <div class="stat">
+        <div class="label">Baseline latency (mean)</div>
+        <div class="value">${lat.baseline_mean_ms.toFixed(1)} ms</div>
+      </div>
+      <div class="stat">
+        <div class="label">Candidate latency (mean)</div>
+        <div class="value">${lat.candidate_mean_ms.toFixed(1)} ms</div>
+        <div class="delta ${lat.latency_delta_ms < 0 ? 'up' : 'down'}">${lat.latency_delta_ms >= 0 ? '+' : ''}${lat.latency_delta_ms.toFixed(1)} ms · ${speedup} speedup</div>
+      </div>
+    </div>
+  `;
+
+  const rows = report.per_class_deltas.map(d => `
+    <tr class="${d.flag}">
+      <td>${d.class}</td>
+      <td>${d.baseline_ap.toFixed(3)}</td>
+      <td>${d.candidate_ap.toFixed(3)}</td>
+      <td style="color:${d.delta < 0 ? 'var(--critical)' : 'var(--ok)'}">${d.delta >= 0 ? '+' : ''}${d.delta.toFixed(3)}</td>
+      <td><span class="flag-pill ${d.flag}">${d.flag}</span></td>
+    </tr>
+  `).join('');
+
+  const table = `
+    <div class="card" id="metrics">
+      <h2>Per-class comparison (worst regressions first)</h2>
+      <table>
+        <thead><tr><th>Class</th><th>Baseline AP</th><th>Candidate AP</th><th>Delta</th><th>Flag</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+
+  const insights = report.llm_insights;
+  const insightsCard = insights ? `
+    <div class="card insights-card">
+      <h2>✨ AI Insights</h2>
+      <p class="insights-summary">${insights.summary}</p>
+      ${insights.likely_cause ? `<p class="insights-cause"><strong>Likely cause:</strong> ${insights.likely_cause}</p>` : ''}
+      ${insights.recommendations && insights.recommendations.length ? `
+        <ul class="insights-recs">
+          ${insights.recommendations.map(r => `<li>${r}</li>`).join('')}
+        </ul>
+      ` : ''}
+      <div class="insights-attrib">Generated by ${insights.model}</div>
+    </div>
+  ` : '';
+
+  resultsEl.innerHTML = `
+    ${banner}
+    <div class="card">
+      <h2>Summary</h2>
+      ${stats}
+    </div>
+    ${insightsCard}
+    ${table}
+  `;
+}
+</script>
+</body>
+</html>

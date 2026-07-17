@@ -1,0 +1,12 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+.env
+.tmp/
+.pipcache/
+
+# Runtime data: SQLite DB, uploaded jobs, downloaded/exported models and
+# datasets. Regenerate locally with backend/scripts/prepare_models.py and
+# backend/scripts/make_sample_dataset.py.
+backend/data/

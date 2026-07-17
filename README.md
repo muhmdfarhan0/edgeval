@@ -15,12 +15,13 @@ frontend/   Static site (vanilla HTML/CSS/JS) — upload UI + report view
 
 The two are deployed separately and talk over HTTP:
 
-- **Backend** → a container host with persistent disk (Railway, Render, Fly.io,
-  or a Hugging Face Space with the Docker SDK). Not deployable to serverless
-  platforms (Vercel functions, AWS Lambda) — the ML dependencies (torch,
-  onnxruntime, opencv) and multi-minute job runtimes don't fit that model.
-- **Frontend** → Vercel (or any static host). Set `API_BASE` near the top of
-  the `<script>` block in `frontend/index.html` to your deployed backend's URL.
+- **Backend** → Render, via the `render.yaml` Blueprint at the repo root
+  (Docker-based container host, not serverless — the ML dependencies (torch,
+  onnxruntime, opencv) and multi-minute job runtimes don't fit a functions
+  platform like Vercel's or Lambda's).
+- **Frontend** → Vercel, with the `frontend/` folder set as the project root.
+  Set `API_BASE` near the top of the `<script>` block in `frontend/index.html`
+  to the Render service's URL once it's live.
 
 ## Local development
 
@@ -51,8 +52,29 @@ rule-based, regardless of whether this is configured).
 
 ## Deploying
 
-1. Deploy `backend/` (it has its own `Dockerfile`) to Railway/Render/Fly.io/
-   a Docker-SDK Hugging Face Space. Mount a persistent volume at the path
-   `DATA_DIR` points to, and set `ALLOWED_ORIGINS` to your frontend's URL.
-2. Deploy `frontend/` to Vercel as a static site, with `API_BASE` in
-   `index.html` pointed at the backend's public URL.
+### Backend → Render
+
+1. In the Render dashboard: **New > Blueprint**, connect this GitHub repo.
+   Render reads `render.yaml` and configures the Docker web service rooted at
+   `backend/` automatically.
+2. When prompted, paste in `GROQ_API_KEY` (deliberately excluded from
+   `render.yaml`/git — see `backend/.env.example`).
+3. Deploy. The first build installs torch/onnxruntime/opencv and takes a
+   few minutes.
+4. Once live, note the service URL (`https://edgeval-api-xxxx.onrender.com`).
+5. **Free-tier caveat:** Render's free plan has no persistent disk and spins
+   the service down after inactivity — the SQLite DB and uploaded models/
+   datasets don't survive a restart, and the first request after idle will be
+   slow (cold start + model load). Fine for a demo; upgrade to a paid plan
+   with a disk mounted at `DATA_DIR` (`/app/data`) if job history needs to
+   persist.
+6. Once you have a final frontend URL (see below), update `ALLOWED_ORIGINS`
+   in the Render service's environment settings from `*` to that exact URL.
+
+### Frontend → Vercel
+
+1. Import this GitHub repo in Vercel, set the **root directory** to `frontend`.
+2. Before or after deploying, set `API_BASE` near the top of the `<script>`
+   block in `frontend/index.html` to the Render URL from above, then push.
+3. Once Vercel assigns a domain, go back and lock down the backend's
+   `ALLOWED_ORIGINS` to that domain (step 6 above).

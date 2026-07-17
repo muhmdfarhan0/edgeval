@@ -1,10 +1,20 @@
 # EdgeEval
 
-Catch computer vision model regressions before you ship them to the edge.
-Upload a baseline model and a quantized/optimized candidate (YOLO, ONNX,
-INT8) plus a validation set — get per-class mAP/precision/recall deltas,
-a latency comparison, an AI-generated explanation of what changed, and a
-rule-based deployment recommendation.
+**[Live demo →](https://edgeval.vercel.app)**
+
+Catch per-class accuracy regressions in quantized computer vision models —
+YOLO, ONNX, INT8 — before you deploy them to edge hardware. There's no
+"Promptfoo for computer vision": every eval tool on the market (Promptfoo,
+DeepEval, LangSmith, Braintrust) evaluates LLM/text output, not CV models.
+EdgeEval fills that gap.
+
+Upload a baseline model and a quantized/optimized candidate (`.pt` or
+`.onnx`) plus a YOLO-format validation set — get IoU-matched per-class
+mAP@0.5, precision/recall deltas, a latency benchmark, an AI-generated
+plain-English explanation of what changed, and a rule-based deployment
+recommendation. Per-class breakdown is the differentiator: aggregate
+mAP can barely move while one class silently regresses 20+ points —
+exactly the kind of failure that breaks a model in production.
 
 ## Structure
 

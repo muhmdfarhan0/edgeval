@@ -4,8 +4,36 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>How EdgeEval Works — Per-Class CV Model Regression Testing Pipeline</title>
-<meta name="description" content="How EdgeEval evaluates quantized computer vision models: upload a baseline and candidate (YOLO, ONNX, INT8), run inference on identical data, compute IoU-matched per-class precision/recall/mAP@0.5, benchmark latency, apply regression thresholds, and get a deployment recommendation." />
+<meta name="description" content="How EdgeEval evaluates quantized CV models: IoU matching, per-class mAP@0.5, latency benchmarking, and threshold-based deployment recommendations for YOLO, ONNX, and INT8 models." />
+<meta name="robots" content="index, follow" />
+<link rel="canonical" href="https://edgeval.vercel.app/how-it-works" />
 <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="EdgeEval" />
+<meta property="og:url" content="https://edgeval.vercel.app/how-it-works" />
+<meta property="og:title" content="How EdgeEval Works — Per-Class CV Model Regression Testing Pipeline" />
+<meta property="og:description" content="IoU matching, per-class mAP@0.5, latency benchmarking, and threshold-based deployment recommendations for quantized YOLO, ONNX, and INT8 models." />
+<meta property="og:image" content="https://edgeval.vercel.app/how-it-works.png" />
+
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="How EdgeEval Works — Per-Class CV Model Regression Testing Pipeline" />
+<meta name="twitter:description" content="IoU matching, per-class mAP@0.5, latency benchmarking, and threshold-based deployment recommendations for quantized CV models." />
+<meta name="twitter:image" content="https://edgeval.vercel.app/how-it-works.png" />
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": "How EdgeEval Works — Per-Class CV Model Regression Testing Pipeline",
+  "url": "https://edgeval.vercel.app/how-it-works",
+  "description": "How EdgeEval evaluates quantized CV models: IoU matching, per-class mAP@0.5, latency benchmarking, and threshold-based deployment recommendations.",
+  "about": {
+    "@type": "SoftwareApplication",
+    "name": "EdgeEval"
+  }
+}
+</script>
 <style>
   :root {
     --cream: #f4f1e8;

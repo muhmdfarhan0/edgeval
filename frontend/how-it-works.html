@@ -7,6 +7,9 @@
 <meta name="description" content="How EdgeEval evaluates quantized CV models: IoU matching, per-class mAP@0.5, latency benchmarking, and threshold-based deployment recommendations for YOLO, ONNX, and INT8 models." />
 <meta name="robots" content="index, follow" />
 <link rel="canonical" href="https://edgeval.vercel.app/how-it-works" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist+Pixel&display=swap" rel="stylesheet" />
 <link rel="icon" type="image/svg+xml" href="/logo.svg" />
 
 <meta property="og:type" content="website" />
@@ -44,14 +47,27 @@
     --accent: #29392f;
     --accent-2: #a8462f;
   }
-  * { box-sizing: border-box; }
+  * {
+    box-sizing: border-box;
+    font-family: "Geist Pixel", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: 400;
+    font-style: normal;
+    font-variation-settings: "ELSH" 0;
+  }
   html { scroll-behavior: smooth; }
   body {
     margin: 0;
     background: var(--cream);
     color: var(--ink);
-    font-family: Georgia, "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, serif;
     -webkit-font-smoothing: antialiased;
+  }
+  .geist-pixel, .geist-pixel-body {
+    font-family: "Geist Pixel", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: 400;
+    font-style: normal;
+    font-variation-settings: "ELSH" 0;
   }
   nav {
     display: flex; align-items: center; justify-content: space-between;

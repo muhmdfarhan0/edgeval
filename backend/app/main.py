@@ -7,6 +7,16 @@ from pathlib import Path
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.datastructures import UploadFile as StarletteUploadFile
+from starlette.formparsers import MultiPartParser
+
+# Starlette spools any multipart file part over 1MB (its default) to a real
+# temp file during parsing — meaning our model/dataset uploads (all >1MB)
+# already get written to disk once before _save_upload() below writes them
+# again to their final destination. Raising this lets moderate-sized uploads
+# stay in memory through parsing, cutting that redundant disk write. Bounded
+# deliberately (not raised further) so a very large upload still falls back
+# to disk-backed spooling instead of risking OOM on a memory-constrained hosts.
+MultiPartParser.spool_max_size = 25 * 1024 * 1024  # 25MB
 
 from app.config import ALLOWED_ORIGINS, CONF_THRESHOLD, JOBS_DIR
 from app.db import PIPELINE_STAGES, EvaluationJob, get_session, init_db

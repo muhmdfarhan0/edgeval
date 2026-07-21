@@ -34,6 +34,14 @@ AP_DROP_CRITICAL_THRESHOLD = 0.15
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
 
+# Remote demo asset URLs for a hosted demo dataset and model pair.
+# If configured, /evaluate/demo will download and cache these once.
+DEMO_BASELINE_URL = os.environ.get("DEMO_BASELINE_URL")
+DEMO_CANDIDATE_URL = os.environ.get("DEMO_CANDIDATE_URL")
+DEMO_DATASET_URL = os.environ.get("DEMO_DATASET_URL")
+DEMO_CACHE_DIR = DATA_DIR / "demo_assets"
+DEMO_CACHE_DIR.mkdir(exist_ok=True)
+
 # Comma-separated list of origins allowed to call this API (e.g. your Vercel
 # frontend's URL). Defaults to "*" for local development/testing — restrict
 # this in production via the ALLOWED_ORIGINS env var.

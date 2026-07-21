@@ -3,6 +3,7 @@ from __future__ import annotations
 import shutil
 import uuid
 from pathlib import Path
+from urllib.request import urlretrieve
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,7 +19,16 @@ from starlette.formparsers import MultiPartParser
 # to disk-backed spooling instead of risking OOM on a memory-constrained hosts.
 MultiPartParser.spool_max_size = 25 * 1024 * 1024  # 25MB
 
-from app.config import ALLOWED_ORIGINS, CONF_THRESHOLD, DATA_DIR, JOBS_DIR
+from app.config import (
+    ALLOWED_ORIGINS,
+    CONF_THRESHOLD,
+    DATA_DIR,
+    DEMO_BASELINE_URL,
+    DEMO_CANDIDATE_URL,
+    DEMO_DATASET_URL,
+    DEMO_CACHE_DIR,
+    JOBS_DIR,
+)
 from app.db import PIPELINE_STAGES, EvaluationJob, get_session, init_db
 from app.security import enforce_rate_limit, require_api_key
 from app.services.dataset_loader import extract_dataset_zip
@@ -62,6 +72,45 @@ def _save_upload(upload: UploadFile, dest: Path) -> Path:
     with dest.open("wb") as f:
         shutil.copyfileobj(upload.file, f)
     return dest
+
+
+def _download_demo_asset(url: str, dest: Path) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if dest.exists():
+        return dest
+    try:
+        urlretrieve(url, dest)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Failed to download demo asset from {url}: {exc}",
+        )
+    return dest
+
+
+def _ensure_demo_assets() -> tuple[Path, Path, Path]:
+    local_baseline = DATA_DIR / "models" / "baseline_yolov8n.pt"
+    local_candidate = DATA_DIR / "models" / "candidate_yolov8n_int8.onnx"
+    local_dataset = DATA_DIR / "validation_sample.zip"
+
+    if local_baseline.exists() and local_candidate.exists() and local_dataset.exists():
+        return local_baseline, local_candidate, local_dataset
+
+    if not (DEMO_BASELINE_URL and DEMO_CANDIDATE_URL and DEMO_DATASET_URL):
+        raise HTTPException(
+            status_code=500,
+            detail="Demo files are not available locally and no remote demo URLs are configured.",
+        )
+
+    baseline_dest = DEMO_CACHE_DIR / "baseline_yolov8n.pt"
+    candidate_dest = DEMO_CACHE_DIR / "candidate_yolov8n_int8.onnx"
+    dataset_dest = DEMO_CACHE_DIR / "validation_sample.zip"
+
+    _download_demo_asset(DEMO_BASELINE_URL, baseline_dest)
+    _download_demo_asset(DEMO_CANDIDATE_URL, candidate_dest)
+    _download_demo_asset(DEMO_DATASET_URL, dataset_dest)
+
+    return baseline_dest, candidate_dest, dataset_dest
 
 
 def _metrics_to_dict(metrics) -> dict:
@@ -229,15 +278,7 @@ async def evaluate(request: Request, background_tasks: BackgroundTasks):
 
 @app.post("/evaluate/demo", dependencies=[Depends(enforce_rate_limit)])
 def evaluate_demo(background_tasks: BackgroundTasks):
-    demo_baseline = DATA_DIR / "models" / "baseline_yolov8n.pt"
-    demo_candidate = DATA_DIR / "models" / "candidate_yolov8n_int8.onnx"
-    demo_dataset = DATA_DIR / "validation_sample.zip"
-
-    if not demo_baseline.exists() or not demo_candidate.exists() or not demo_dataset.exists():
-        raise HTTPException(
-            status_code=500,
-            detail="Demo files are not available on the server.",
-        )
+    demo_baseline, demo_candidate, demo_dataset = _ensure_demo_assets()
 
     job_id = str(uuid.uuid4())
     job_dir = JOBS_DIR / job_id

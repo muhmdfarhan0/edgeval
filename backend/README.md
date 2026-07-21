@@ -16,3 +16,16 @@ choose **New > Blueprint**, point it at this GitHub repo, and it will pick up
 the Docker build (rooted at `backend/`) automatically. You'll be prompted to
 paste in `GROQ_API_KEY` (kept out of git on purpose). See the root `README.md`
 for the full deployment checklist.
+
+## Demo assets
+
+The backend supports a hosted demo mode using remote asset URLs. If local demo
+files are unavailable, the `/evaluate/demo` route downloads and caches these
+files automatically from the following env vars:
+
+- `DEMO_BASELINE_URL`
+- `DEMO_CANDIDATE_URL`
+- `DEMO_DATASET_URL`
+
+Set these in Render or your local environment to enable the demo flow without
+shipping large assets in the repo.

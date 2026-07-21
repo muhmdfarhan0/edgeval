@@ -18,7 +18,7 @@ from starlette.formparsers import MultiPartParser
 # to disk-backed spooling instead of risking OOM on a memory-constrained hosts.
 MultiPartParser.spool_max_size = 25 * 1024 * 1024  # 25MB
 
-from app.config import ALLOWED_ORIGINS, CONF_THRESHOLD, JOBS_DIR
+from app.config import ALLOWED_ORIGINS, CONF_THRESHOLD, DATA_DIR, JOBS_DIR
 from app.db import PIPELINE_STAGES, EvaluationJob, get_session, init_db
 from app.security import enforce_rate_limit, require_api_key
 from app.services.dataset_loader import extract_dataset_zip
@@ -225,6 +225,57 @@ async def evaluate(request: Request, background_tasks: BackgroundTasks):
     )
 
     return {"job_id": job_id, "status": "pending"}
+
+
+@app.post("/evaluate/demo", dependencies=[Depends(enforce_rate_limit)])
+def evaluate_demo(background_tasks: BackgroundTasks):
+    demo_baseline = DATA_DIR / "models" / "baseline_yolov8n.pt"
+    demo_candidate = DATA_DIR / "models" / "candidate_yolov8n_int8.onnx"
+    demo_dataset = DATA_DIR / "validation_sample.zip"
+
+    if not demo_baseline.exists() or not demo_candidate.exists() or not demo_dataset.exists():
+        raise HTTPException(
+            status_code=500,
+            detail="Demo files are not available on the server.",
+        )
+
+    job_id = str(uuid.uuid4())
+    job_dir = JOBS_DIR / job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
+
+    baseline_path = job_dir / demo_baseline.name
+    candidate_path = job_dir / demo_candidate.name
+    dataset_zip_path = job_dir / demo_dataset.name
+    shutil.copy2(demo_baseline, baseline_path)
+    shutil.copy2(demo_candidate, candidate_path)
+    shutil.copy2(demo_dataset, dataset_zip_path)
+
+    session = get_session()
+    try:
+        job = EvaluationJob(
+            id=job_id,
+            status="pending",
+            stage="queued",
+            baseline_filename=demo_baseline.name,
+            candidate_filename=demo_candidate.name,
+        )
+        session.add(job)
+        session.commit()
+    finally:
+        session.close()
+
+    background_tasks.add_task(
+        _run_evaluation_job,
+        job_id,
+        job_dir,
+        baseline_path,
+        candidate_path,
+        dataset_zip_path,
+        demo_baseline.name,
+        demo_candidate.name,
+    )
+
+    return {"job_id": job_id, "status": "pending", "demo": True}
 
 
 @app.get("/evaluate/{job_id}/status")

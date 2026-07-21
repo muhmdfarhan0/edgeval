@@ -224,6 +224,9 @@
   }
   .field { margin-bottom: 18px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
   .field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 7px; }
+  button.demo-btn {
+    background: linear-gradient(90deg, var(--accent-2) 0%, var(--accent) 50%, var(--accent-2) 100%);
+  }
   input[type="file"] {
     width: 100%;
     padding: 12px;
@@ -478,7 +481,7 @@
 
   <section class="section" id="run">
     <h2>Run an Evaluation</h2>
-    <p class="lede">Upload your models and validation set below to generate a live per-class regression report. Curious how the pipeline works first? See <a href="/how-it-works" style="color:var(--accent-2)">How It Works</a>.</p>
+    <p class="lede">Upload your models and validation set below to generate a live per-class regression report. Or run the built-in demo test with smaller sample data to see the pipeline in action right away.</p>
 
     <div class="card">
       <h2>Evaluation inputs</h2>
@@ -495,7 +498,10 @@
           <label for="validation_dataset">Validation dataset (.zip, YOLO format: images/ + labels/)</label>
           <input type="file" id="validation_dataset" name="validation_dataset" required accept=".zip" />
         </div>
-        <button type="submit" class="run-btn" id="submit-btn">Run evaluation</button>
+        <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+          <button type="submit" class="run-btn" id="submit-btn">Run evaluation</button>
+          <button type="button" class="run-btn demo-btn" id="demo-btn">Run demo test</button>
+        </div>
         <div id="status-line"></div>
       </form>
 
@@ -567,6 +573,7 @@ const STAGES = [
 const form = document.getElementById('eval-form');
 const statusLine = document.getElementById('status-line');
 const submitBtn = document.getElementById('submit-btn');
+const demoBtn = document.getElementById('demo-btn');
 const resultsEl = document.getElementById('results');
 const progressPanel = document.getElementById('progress-panel');
 const progressFill = document.getElementById('progress-fill');
@@ -601,35 +608,51 @@ function stopTimer() {
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
+  await startRun(`${API_BASE}/evaluate`, true);
+});
+
+demoBtn.addEventListener('click', async () => {
+  await startRun(`${API_BASE}/evaluate/demo`, false, 'Running built-in demo sample data… 😎');
+});
+
+async function startRun(url, useForm = true, initialMessage = 'Uploading…') {
   resultsEl.innerHTML = '';
   submitBtn.disabled = true;
-  statusLine.textContent = 'Uploading…';
+  demoBtn.disabled = true;
+  statusLine.textContent = initialMessage;
   progressPanel.style.display = 'block';
   progressFill.style.width = '5%';
   renderStageList(0);
   startTimer();
 
-  const fd = new FormData();
-  fd.append('baseline_model', document.getElementById('baseline_model').files[0]);
-  fd.append('candidate_model', document.getElementById('candidate_model').files[0]);
-  fd.append('validation_dataset', document.getElementById('validation_dataset').files[0]);
-
   try {
-    const res = await fetch(`${API_BASE}/evaluate`, { method: 'POST', body: fd });
+    let res;
+    if (useForm) {
+      const fd = new FormData();
+      fd.append('baseline_model', document.getElementById('baseline_model').files[0]);
+      fd.append('candidate_model', document.getElementById('candidate_model').files[0]);
+      fd.append('validation_dataset', document.getElementById('validation_dataset').files[0]);
+      res = await fetch(url, { method: 'POST', body: fd });
+    } else {
+      res = await fetch(url, { method: 'POST' });
+    }
+
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.detail || `HTTP ${res.status}`);
     }
-    const { job_id } = await res.json();
-    statusLine.textContent = `Job ${job_id} queued`;
+
+    const { job_id, demo } = await res.json();
+    statusLine.textContent = demo ? `Demo job ${job_id} queued 🎉` : `Job ${job_id} queued`;
     await poll(job_id);
   } catch (err) {
     statusLine.textContent = `Error: ${err.message}`;
     submitBtn.disabled = false;
+    demoBtn.disabled = false;
     stopTimer();
     progressPanel.style.display = 'none';
   }
-});
+}
 
 async function poll(jobId) {
   while (true) {
